@@ -1,0 +1,56 @@
+group 'com.example.zcs_printing'
+version '1.0-SNAPSHOT'
+
+buildscript {
+    ext.kotlin_version = '1.9.0'
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.1.0'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+
+android {
+    namespace 'com.example.zcs_printing'
+    compileSdkVersion 34
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+
+    sourceSets {
+        main.java.srcDirs += 'src/main/kotlin'
+    }
+
+    defaultConfig {
+        minSdkVersion 23
+    }
+}
+
+dependencies {
+    // ZCS SDK - compileOnly so they're available at compile time but not packaged into plugin AAR
+    // The consuming app must provide these AAR files in its libs folder
+    compileOnly fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
+    // Android PrintHelper for system print
+    implementation 'androidx.print:print:1.1.0'
+    // Note: ZXing is already included in SmartPos SDK, so we don't add it separately
+}
