@@ -43,6 +43,6 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# ZCS SDK files (not included in plugin)
-android/libs/*.aar
-android/libs/*.jar
+# ZCS SDK: include android/libs/*.aar in the repo so the plugin compiles when
+# consumed via Git (e.g. zcs_printing from GitHub). Otherwise :zcs_printing:compileReleaseKotlin fails.
+# To avoid committing the AAR, use a path dependency and add the AAR only locally.

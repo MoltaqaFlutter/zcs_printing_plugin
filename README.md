@@ -95,6 +95,8 @@ The plugin provides the ZCS SDK to your app transitively. You must put the AAR f
 | **Using the plugin from path or Git** | Copy the AAR into the plugin’s **`android/libs/`** folder (the `libs` folder inside the `zcs_printing` package). |
 | **Using the plugin from pub.dev** | The published package must already include the AAR in `android/libs/`. If it does not, use a path or Git dependency and add the AAR as above. |
 
+**Important for Git dependency:** If other projects depend on this plugin via `git:` (e.g. `ref: main`), the AAR must be **committed** in the plugin repo’s `android/libs/`. Otherwise `flutter build apk` fails with `:zcs_printing:compileReleaseKotlin` (unresolved ZCS types). The plugin’s `.gitignore` does not exclude `android/libs/*.aar` for this reason.
+
 **Files:**
 
 - **Required:** `SmartPos_2.0.1_R251024.aar`
