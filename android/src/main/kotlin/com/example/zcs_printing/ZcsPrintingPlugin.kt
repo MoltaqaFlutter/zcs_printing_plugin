@@ -364,6 +364,11 @@ class ZcsPrintingPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                     }
                 }
             }
+            "cancelPrint" -> {
+                // System print dialog cannot be dismissed programmatically on Android.
+                // Direct ZCS print has no cancel API in the SDK.
+                result.success(false)
+            }
             "printWithSystem" -> {
                 val imageBytes = call.argument<ByteArray>("imageBytes")
                     ?: run {

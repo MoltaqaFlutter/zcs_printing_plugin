@@ -10,7 +10,7 @@ This plugin connects your Flutter app to **ZCS/SmartPos** thermal printers (typi
 - **Print QR codes or barcodes** (tickets, loyalty, product codes)
 - **Print images or logos** (receipt headers, promotions)
 - **Print PDFs** (invoices, reports) by converting pages to images and sending to the printer
-- **Use the system print dialog** on Android so users can choose any printer or save as PDF
+- **Use the system print dialog** on Android and iOS so users can choose any printer or save as PDF
 - **Print labels** on label-capable devices
 - **Open the cash drawer** when using a connected drawer
 
@@ -28,7 +28,8 @@ You need the ZCS SDK (`.aar`) and compatible ZCS/SmartPos hardware; the plugin h
 
 - Direct ZCS printer control: text, QR codes, barcodes, bitmaps, labels
 - PDF printing (converts PDF to bitmaps and prints)
-- Android system print (PrintHelper: choose printer or Save as PDF)
+- Android and iOS system print (PrintHelper / UIPrintInteractionController: choose printer or Save as PDF)
+- Cancel current print (dismiss system print sheet on iOS when applicable)
 - Multiple copies with optional cut and spacing between copies
 - Type-safe API with enums and clear error handling
 - Reusable format presets (`PrintFormats`) for common scenarios
@@ -37,8 +38,8 @@ You need the ZCS SDK (`.aar`) and compatible ZCS/SmartPos hardware; the plugin h
 
 | Platform | Support |
 |----------|---------|
-| Android  | Full    |
-| iOS      | Returns `PrinterError.platformUnsupported` |
+| Android  | Full (ZCS hardware + system print) |
+| iOS      | System print only (`printWithSystem`); all other methods return `PrinterError.platformUnsupported` |
 
 ## Installation
 
@@ -64,9 +65,11 @@ Then run `flutter pub get`. For private repos, ensure Git can clone the repo (SS
 ## Android setup
 
 1. **ZCS SDK**  
-   Copy the ZCS SDK artifacts into your app's `android/app/libs/`:
-   - Required: `SmartPos_2.0.1_R251024.aar`
-   - Optional: `emv_2.0.1_R251023.aar` (EMV; not used by this plugin)
+   The plugin compiles against the ZCS SDK. You need the AAR file(s) in **two** places when building:
+   - **Plugin (required for compilation):** Copy into the plugin’s `android/libs/`:
+     - Required: `SmartPos_2.0.1_R251024.aar`
+     - Optional: `emv_2.0.1_R251023.aar` (EMV; not used by this plugin)
+   - **Your app (required at runtime):** Copy the same file(s) into your app’s `android/app/libs/`.
 
 2. **Permissions**  
    In `android/app/src/main/AndroidManifest.xml`:
@@ -84,7 +87,8 @@ Then run `flutter pub get`. For private repos, ensure Git can clone the repo (SS
    ```
 
 3. **Gradle**  
-   In `android/app/build.gradle`:
+   The plugin’s `android/build.gradle` already has `compileOnly fileTree(dir: 'libs', include: ['*.jar', '*.aar'])` so the plugin can compile when the AARs are in `zcs_printing/android/libs/`.  
+   In your **app’s** `android/app/build.gradle`:
 
    ```gradle
    dependencies {
@@ -207,9 +211,9 @@ bool success = await printer.printPdf(
 );
 ```
 
-### System print (Android dialog)
+### System print (Android / iOS)
 
-Shows the system print dialog so the user can pick a printer or Save as PDF:
+Shows the system print dialog so the user can pick a printer or Save as PDF. On Android uses PrintHelper; on iOS uses the system print sheet (UIPrintInteractionController).
 
 ```dart
 bool success = await printer.printWithSystem(
@@ -217,6 +221,17 @@ bool success = await printer.printWithSystem(
   copies: 1,
   cutAfterEachCopy: false,
 );
+```
+
+### Cancel print
+
+Cancel the current printing operation if possible. On iOS, dismisses the system print sheet when it is open. On Android, the system print dialog cannot be dismissed programmatically (returns `false`).
+
+```dart
+bool cancelled = await printer.cancelPrint();
+if (cancelled) {
+  // Print sheet was dismissed (e.g. on iOS)
+}
 ```
 
 ### Label mode
@@ -284,6 +299,7 @@ await printer.appendText('Custom', format);
 | `PrinterError`            | Error with `code` and `message` |
 | `PrnStrFormat`             | Text format (size, alignment, style, font) |
 | `PrintFormats`            | Preset formats (header, normal, bold, etc.) |
+| `cancelPrint()`           | Dismiss system print sheet (iOS) or no-op (Android); returns `true` if cancelled |
 
 Full usage examples: [example/lib/main.dart](example/lib/main.dart).
 
@@ -294,14 +310,15 @@ cd example
 flutter run
 ```
 
-The example demonstrates: status check, receipt, QR, barcode, image (gallery), PDF (file picker), and system print.
+The example demonstrates: status check, receipt, QR, barcode, image (gallery), PDF (file picker), system print (Android and iOS), and cancel print.
 
 ## Notes
 
-- Printing is implemented via the ZCS SDK on Android; iOS returns platform unsupported.
+- Printing is implemented via the ZCS SDK on Android; on iOS only system print (`printWithSystem`) is supported.
 - PDF printing converts each page to bitmaps then prints.
-- System print uses Android `PrintHelper`; cut behavior depends on the selected printer.
-- Cutter is used only when `isSupportCutter()` is true; cutting is skipped otherwise.
+- System print uses Android `PrintHelper` or iOS `UIPrintInteractionController`; cut behavior depends on the selected printer.
+- Cutter is used only when `isSupportCutter()` is true (Android only); cutting is skipped otherwise.
+- `cancelPrint()` dismisses the system print sheet on iOS when it is presented; on Android it returns `false`.
 
 ## License
 

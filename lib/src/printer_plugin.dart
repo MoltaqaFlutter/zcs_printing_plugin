@@ -326,16 +326,23 @@ class PrinterPlugin implements IPrintingServiceInterface {
     int copies = 1,
     bool cutAfterEachCopy = false,
   }) async {
-    if (!Platform.isAndroid) {
-      throw PrinterError.platformUnsupported();
-    }
-
+    // Supported on both Android (PrintHelper) and iOS (UIPrintInteractionController)
     try {
       final bool result = await _channel.invokeMethod('printWithSystem', {
         'imageBytes': imageBytes,
         'copies': copies,
         'cutAfterEachCopy': cutAfterEachCopy,
       });
+      return result;
+    } on PlatformException catch (e) {
+      throw _handlePlatformException(e);
+    }
+  }
+
+  @override
+  Future<bool> cancelPrint() async {
+    try {
+      final bool result = await _channel.invokeMethod('cancelPrint');
       return result;
     } on PlatformException catch (e) {
       throw _handlePlatformException(e);

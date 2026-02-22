@@ -221,11 +221,20 @@ abstract class IPrintingServiceInterface {
   /// 
   /// Throws: PrinterError if image is invalid, printer unavailable, or other error occurs
   /// 
-  /// Note: This uses Android PrintHelper, not ZCS SDK. User selects printer or "Save as PDF" in dialog.
+  /// Note: This uses Android PrintHelper / iOS UIPrintInteractionController. User selects printer or "Save as PDF" in dialog.
   /// Cut functionality depends on selected printer capabilities.
   Future<bool> printWithSystem(
     Uint8List imageBytes, {
     int copies = 1,
     bool cutAfterEachCopy = false,
   });
+
+  /// Cancel current printing operation if possible.
+  ///
+  /// On iOS: Dismisses the system print sheet if it is currently presented.
+  /// On Android: System print dialog cannot be dismissed programmatically; returns false.
+  /// For direct ZCS printing, cancellation is not supported; returns false.
+  ///
+  /// Returns: true if a print operation was cancelled/dismissed, false otherwise.
+  Future<bool> cancelPrint();
 }

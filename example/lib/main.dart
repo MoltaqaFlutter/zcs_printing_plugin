@@ -368,7 +368,7 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
-  /// Print with Android system print dialog
+  /// Print with system print dialog (Android: PrintHelper, iOS: system print sheet)
   Future<void> _printWithSystem() async {
     setState(() => _isLoading = true);
     try {
@@ -409,6 +409,26 @@ class _MyAppState extends State<MyApp> {
       setState(() => _isLoading = false);
       _showToast('Unexpected error: $e', Colors.red);
       debugPrint('System print unexpected error: $e\n$stackTrace');
+    }
+  }
+
+  /// Cancel current printing operation (e.g. dismiss system print sheet on iOS)
+  Future<void> _cancelPrint() async {
+    setState(() => _isLoading = true);
+    try {
+      final cancelled = await _printer.cancelPrint();
+      setState(() => _isLoading = false);
+      if (cancelled) {
+        _showToast('Print cancelled', Colors.green);
+      } else {
+        _showToast('Nothing to cancel or cancel not supported', Colors.orange);
+      }
+    } on PrinterError catch (e) {
+      setState(() => _isLoading = false);
+      _showToast('Cancel error: ${_getErrorMessage(e)}', Colors.red);
+    } catch (e) {
+      setState(() => _isLoading = false);
+      _showToast('Unexpected error: $e', Colors.red);
     }
   }
 
@@ -816,9 +836,16 @@ class _MyAppState extends State<MyApp> {
             const SizedBox(height: 12),
             _buildPrintButton(
               'Print with System',
-              Icons.print_disabled,
+              Icons.print,
               _printWithSystem,
               Colors.indigo,
+            ),
+            const SizedBox(height: 12),
+            _buildPrintButton(
+              'Cancel print',
+              Icons.cancel_outlined,
+              _cancelPrint,
+              Colors.grey,
             ),
           ],
         ),
