@@ -55,7 +55,7 @@ If the package is in a **private Git repo** (e.g. GitHub Enterprise), use a git 
 dependencies:
   zcs_printing:
     git:
-      url: https://github.yourcompany.com/YourOrg/zcs_printing.git
+      url: https://github.com/MoltaqaFlutter/zcs_printing_plugin.git
       ref: main   # or tag, e.g. v1.0.0
 ```
 
