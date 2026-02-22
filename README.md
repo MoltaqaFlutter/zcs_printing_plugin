@@ -1,39 +1,76 @@
 # zcs_printing
 
-A Flutter plugin for ZCS/SmartPos printer integration with PDF printing and system print support.
+A Flutter plugin for ZCS/SmartPos printer integration: direct printer control, PDF printing, and Android system print support.
+
+## What it's for
+
+This plugin connects your Flutter app to **ZCS/SmartPos** thermal printers (typically Bluetooth or USB). Use it when you need to:
+
+- **Print receipts** (sales, returns, orders) with text, tables, and totals
+- **Print QR codes or barcodes** (tickets, loyalty, product codes)
+- **Print images or logos** (receipt headers, promotions)
+- **Print PDFs** (invoices, reports) by converting pages to images and sending to the printer
+- **Use the system print dialog** on Android so users can choose any printer or save as PDF
+- **Print labels** on label-capable devices
+- **Open the cash drawer** when using a connected drawer
+
+All of this is done through a single Dart API so you can build POS, kiosk, or retail apps in Flutter without writing Android/iOS native printing code yourself.
+
+## Who benefits
+
+- **Flutter developers** building POS, retail, or kiosk apps that need receipt or label printing on ZCS/SmartPos hardware
+- **Teams** that already use ZCS SDK on Android and want a clean Flutter API instead of platform channels and native code
+- **Enterprises** that standardize on ZCS devices and want one plugin for receipts, QR/barcodes, PDFs, and system print
+
+You need the ZCS SDK (`.aar`) and compatible ZCS/SmartPos hardware; the plugin handles the rest from Dart.
 
 ## Features
 
-- ✅ Direct ZCS printer control (text, QR codes, barcodes, bitmaps, labels)
-- ✅ PDF printing (convert PDF to bitmaps and print)
-- ✅ System print support (Android PrintHelper)
-- ✅ Print copies with optional cut after each copy
-- ✅ Type-safe API with enums and clear error handling
-- ✅ Reusable format presets for common printing scenarios
+- Direct ZCS printer control: text, QR codes, barcodes, bitmaps, labels
+- PDF printing (converts PDF to bitmaps and prints)
+- Android system print (PrintHelper: choose printer or Save as PDF)
+- Multiple copies with optional cut and spacing between copies
+- Type-safe API with enums and clear error handling
+- Reusable format presets (`PrintFormats`) for common scenarios
 
-## Platform Support
+## Platform support
 
-- ✅ Android (full support)
-- ❌ iOS (returns platform unsupported error)
+| Platform | Support |
+|----------|---------|
+| Android  | Full    |
+| iOS      | Returns `PrinterError.platformUnsupported` |
 
 ## Installation
 
-Add this to your `pubspec.yaml`:
+Add to your app's `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  zcs_printing: ^0.0.1
+  zcs_printing: ^1.0.0
 ```
 
-## Setup
+If the package is in a **private Git repo** (e.g. GitHub Enterprise), use a git dependency instead:
 
-### Android
+```yaml
+dependencies:
+  zcs_printing:
+    git:
+      url: https://github.yourcompany.com/YourOrg/zcs_printing.git
+      ref: main   # or tag, e.g. v1.0.0
+```
 
-1. **Add ZCS SDK files**: Copy the ZCS SDK `.aar`/`.jar` files to your app's `android/app/libs/` directory
+Then run `flutter pub get`. For private repos, ensure Git can clone the repo (SSH key or HTTPS with token).
+
+## Android setup
+
+1. **ZCS SDK**  
+   Copy the ZCS SDK artifacts into your app's `android/app/libs/`:
    - Required: `SmartPos_2.0.1_R251024.aar`
-   - Optional: `emv_2.0.1_R251023.aar` (for EMV features, not used by this plugin)
+   - Optional: `emv_2.0.1_R251023.aar` (EMV; not used by this plugin)
 
-2. **Add required permissions** to `android/app/src/main/AndroidManifest.xml`:
+2. **Permissions**  
+   In `android/app/src/main/AndroidManifest.xml`:
+
    ```xml
    <uses-permission android:name="android.permission.BLUETOOTH"/>
    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
@@ -46,7 +83,9 @@ dependencies:
    <uses-permission android:name="android.permission.NFC" />
    ```
 
-3. **Update build.gradle**: Ensure your `android/app/build.gradle` includes:
+3. **Gradle**  
+   In `android/app/build.gradle`:
+
    ```gradle
    dependencies {
        implementation fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
@@ -55,30 +94,38 @@ dependencies:
 
 ## Usage
 
-### Basic Example
+### Import and create printer instance
 
 ```dart
 import 'package:zcs_printing/zcs_printing.dart';
 
 final IPrintingServiceInterface printer = PrinterPlugin();
-
-// Check printer status
-PrinterStatus status = await printer.getPrinterStatus();
-if (status == PrinterStatus.ok) {
-  // Printer is ready
-}
-
-// Print text
-await printer.appendText('Hello World', PrintFormats.normal);
-await printer.startPrint();
 ```
 
-### Print Receipt
+### Check status and cutter support
 
 ```dart
-// Build receipt
+PrinterStatus status = await printer.getPrinterStatus();
+bool supportsCutter = await printer.isSupportCutter();
+
+if (status == PrinterStatus.ok) {
+  // Printer ready
+} else if (status == PrinterStatus.paperOut) {
+  // Handle paper out
+}
+```
+
+### Print text and simple receipt
+
+Build content with `appendText`, `appendStrings`, and `appendEmptyLines`, then call `startPrint`:
+
+```dart
 await printer.appendText('RECEIPT', PrintFormats.header);
+await printer.appendEmptyLines(count: 1);
 await printer.appendText('Date: ${DateTime.now()}', PrintFormats.normal);
+await printer.appendEmptyLines(count: 1);
+
+// Table header
 await printer.appendStrings(
   ['Item', 'Qty', 'Price'],
   [2, 1, 1],
@@ -89,19 +136,23 @@ await printer.appendStrings(
   [2, 1, 1],
   [PrintFormats.normal, PrintFormats.normal, PrintFormats.rightAligned],
 );
-await printer.appendText('Total: \$5.00', PrintFormats.bold);
 
-// Execute print (2 copies, cut after each)
+await printer.appendEmptyLines(count: 1);
+await printer.appendText('Total: \$5.00', PrintFormats.bold);
+await printer.appendEmptyLines(count: 1);
+
 bool success = await printer.startPrint(
   copies: 2,
-  cutAfterEachCopy: true,
+  cutAfterEachCopy: supportsCutter,
+  spacingBetweenCopies: 2,
 );
 ```
 
-### Print QR Code
+### Print QR code
 
 ```dart
 await printer.appendText('QR CODE', PrintFormats.header);
+await printer.appendEmptyLines(count: 1);
 await printer.appendQrCode(
   'https://example.com',
   width: 300,
@@ -111,7 +162,7 @@ await printer.appendQrCode(
 await printer.startPrint();
 ```
 
-### Print Barcode
+### Print barcode
 
 ```dart
 await printer.appendText('BARCODE', PrintFormats.header);
@@ -126,18 +177,17 @@ await printer.appendBarcode(
 await printer.startPrint();
 ```
 
-### Print Image
+### Print image (bytes or file path)
 
 ```dart
 // From bytes
-Uint8List imageBytes = ...; // Your image bytes
 await printer.appendBitmap(
   imageBytes: imageBytes,
   alignment: 'center',
 );
 await printer.startPrint();
 
-// Or from file path
+// From file path
 await printer.appendBitmap(
   imagePath: '/path/to/image.jpg',
   alignment: 'center',
@@ -148,53 +198,70 @@ await printer.startPrint();
 ### Print PDF
 
 ```dart
-Uint8List pdfBytes = ...; // Your PDF bytes
 bool success = await printer.printPdf(
   pdfBytes,
   copies: 1,
   cutAfterEachCopy: true,
   cutBetweenPages: false,
+  spacingBetweenCopies: 0,
 );
 ```
 
-### Print with System (Android Print Dialog)
+### System print (Android dialog)
+
+Shows the system print dialog so the user can pick a printer or Save as PDF:
 
 ```dart
-Uint8List imageBytes = ...; // Your image bytes
 bool success = await printer.printWithSystem(
   imageBytes,
   copies: 1,
   cutAfterEachCopy: false,
 );
-// User will see system print dialog to choose printer or Save as PDF
 ```
 
-### Error Handling
+### Label mode
+
+```dart
+await printer.setPrintType('label');   // or 'label80mm'
+await printer.setPrintLine(lines: 30);
+await printer.printLabel(
+  labelImageBytes,
+  copies: 1,
+  cutAfterEachCopy: true,
+  spacingBetweenCopies: 0,
+);
+```
+
+### Cash drawer and cut
+
+```dart
+await printer.openCashDrawer();
+await printer.cutPaper();   // No-op if device has no cutter
+```
+
+### Error handling
 
 ```dart
 try {
   await printer.startPrint();
 } on PrinterError catch (e) {
-  print('Error code: ${e.code}');
-  print('Error message: ${e.message}');
-  // Show error.message to user
+  // e.code, e.message
+  showError(e.message);
 }
 ```
 
-### Format Presets
+### Text format presets
 
-Use `PrintFormats` helper class for common formats:
+| Preset            | Description              |
+|-------------------|--------------------------|
+| `PrintFormats.header`       | Large, centered, bold    |
+| `PrintFormats.normal`       | Standard text            |
+| `PrintFormats.rightAligned` | Right-aligned (e.g. prices) |
+| `PrintFormats.center`       | Center-aligned           |
+| `PrintFormats.bold`         | Bold                     |
+| `PrintFormats.small`        | Small text               |
 
-```dart
-PrintFormats.header      // Large, centered, bold
-PrintFormats.normal      // Standard text
-PrintFormats.rightAligned // Right-aligned (for prices)
-PrintFormats.center      // Center-aligned
-PrintFormats.bold        // Bold text
-PrintFormats.small       // Small text
-```
-
-### Custom Format
+### Custom format
 
 ```dart
 final format = PrnStrFormat(
@@ -202,50 +269,39 @@ final format = PrnStrFormat(
   alignment: 'center',
   style: 'bold',
   font: 'sansSerif',
-  // For custom font:
-  // font: 'custom',
-  // path: 'fonts/CustomFont.ttf', // Asset path or file path
+  // font: 'custom', path: 'fonts/CustomFont.ttf',
 );
-await printer.appendText('Custom Format', format);
+await printer.appendText('Custom', format);
 ```
 
-## API Reference
+## API reference
 
-See the [example app](example/lib/main.dart) for complete usage examples.
+| Type                      | Description |
+|---------------------------|-------------|
+| `IPrintingServiceInterface` | Interface for all printing operations |
+| `PrinterPlugin`           | Default implementation (use this) |
+| `PrinterStatus`           | `ok`, `paperOut`, `error`, `busy`, `offline` |
+| `PrinterError`            | Error with `code` and `message` |
+| `PrnStrFormat`             | Text format (size, alignment, style, font) |
+| `PrintFormats`            | Preset formats (header, normal, bold, etc.) |
 
-### Main Classes
+Full usage examples: [example/lib/main.dart](example/lib/main.dart).
 
-- `IPrintingServiceInterface` - Interface for all printing operations
-- `PrinterPlugin` - Implementation of the interface
-- `PrinterStatus` - Enum for printer status (ok, paperOut, error, busy, offline)
-- `PrinterError` - Custom error class with user-friendly messages
-- `PrnStrFormat` - Format configuration for text
-- `PrintFormats` - Reusable format presets
-
-## Example App
-
-Run the example app to see all features in action:
+## Example app
 
 ```bash
 cd example
 flutter run
 ```
 
-The example includes:
-- Printer status checking
-- Test receipt printing
-- QR code printing
-- Barcode printing
-- Image printing (from gallery)
-- PDF printing (from file picker)
+The example demonstrates: status check, receipt, QR, barcode, image (gallery), PDF (file picker), and system print.
 
 ## Notes
 
-- All printing logic is handled on the SDK side (Android native)
-- iOS returns `PrinterError.platformUnsupported` for all operations
-- PDF printing converts PDF pages to bitmaps before printing
-- System print uses Android's PrintHelper (user selects printer or Save as PDF)
-- Cut functionality only works if device supports cutter (checked automatically)
+- Printing is implemented via the ZCS SDK on Android; iOS returns platform unsupported.
+- PDF printing converts each page to bitmaps then prints.
+- System print uses Android `PrintHelper`; cut behavior depends on the selected printer.
+- Cutter is used only when `isSupportCutter()` is true; cutting is skipped otherwise.
 
 ## License
 
