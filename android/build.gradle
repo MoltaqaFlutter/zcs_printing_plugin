@@ -47,9 +47,9 @@ android {
 }
 
 dependencies {
-    // ZCS SDK - compileOnly so they're available at compile time but not packaged into plugin AAR
-    // The consuming app must provide these AAR files in its libs folder
-    compileOnly fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
+    // ZCS SDK - implementation so the AAR is supplied transitively to apps that use the plugin
+    // Place AAR(s) only in this plugin's android/libs/; consuming apps do not need to add them
+    implementation fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
     // Android PrintHelper for system print
     implementation 'androidx.print:print:1.1.0'
     // Note: ZXing is already included in SmartPos SDK, so we don't add it separately

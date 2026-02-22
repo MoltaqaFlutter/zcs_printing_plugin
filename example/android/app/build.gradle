@@ -60,6 +60,5 @@ flutter {
 }
 
 dependencies {
-    // ZCS SDK - Add your .aar/.jar files here
-    implementation fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
+    // ZCS SDK is supplied transitively by the zcs_printing plugin (plugin's android/libs/)
 }

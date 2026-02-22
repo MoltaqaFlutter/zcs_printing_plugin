@@ -43,58 +43,84 @@ You need the ZCS SDK (`.aar`) and compatible ZCS/SmartPos hardware; the plugin h
 
 ## Installation
 
-Add to your app's `pubspec.yaml`:
+### Step 1: Add the dependency
+
+In your app’s **`pubspec.yaml`**, add `zcs_printing` using one of the options below.
+
+**Option A — From pub.dev** (when the package is published):
 
 ```yaml
 dependencies:
   zcs_printing: ^1.0.0
 ```
 
-If the package is in a **private Git repo** (e.g. GitHub Enterprise), use a git dependency instead:
+**Option B — From a Git repo** (e.g. private GitHub or GitHub Enterprise):
 
 ```yaml
 dependencies:
   zcs_printing:
     git:
       url: https://github.com/MoltaqaFlutter/zcs_printing_plugin.git
-      ref: main   # or tag, e.g. v1.0.0
+      ref: main   # or a tag, e.g. v1.0.0
 ```
 
-Then run `flutter pub get`. For private repos, ensure Git can clone the repo (SSH key or HTTPS with token).
+**Option C — From a local path** (e.g. you cloned the plugin repo next to your app):
 
-## Android setup
+```yaml
+dependencies:
+  zcs_printing:
+    path: ../zcs_printing
+```
 
-1. **ZCS SDK**  
-   The plugin compiles against the ZCS SDK. You need the AAR file(s) in **two** places when building:
-   - **Plugin (required for compilation):** Copy into the plugin’s `android/libs/`:
-     - Required: `SmartPos_2.0.1_R251024.aar`
-     - Optional: `emv_2.0.1_R251023.aar` (EMV; not used by this plugin)
-   - **Your app (required at runtime):** Copy the same file(s) into your app’s `android/app/libs/`.
+- For Git: ensure the repo is cloneable (SSH key or HTTPS token if private).
+- Then run: **`flutter pub get`**.
 
-2. **Permissions**  
-   In `android/app/src/main/AndroidManifest.xml`:
+### Step 2: Platform-specific setup
 
-   ```xml
-   <uses-permission android:name="android.permission.BLUETOOTH"/>
-   <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
-   <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-   <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
-   <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
-   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
-   <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-   <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-   <uses-permission android:name="android.permission.NFC" />
-   ```
+- **iOS:** No extra setup. System print (`printWithSystem`) works out of the box.
+- **Android:** Follow the [Android setup](#android-setup-required-for-android) below. Required if your app runs on Android and uses ZCS printing or system print.
 
-3. **Gradle**  
-   The plugin’s `android/build.gradle` already has `compileOnly fileTree(dir: 'libs', include: ['*.jar', '*.aar'])` so the plugin can compile when the AARs are in `zcs_printing/android/libs/`.  
-   In your **app’s** `android/app/build.gradle`:
+---
 
-   ```gradle
-   dependencies {
-       implementation fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
-   }
-   ```
+## Android setup (required for Android)
+
+Do these steps **only if** your app targets Android. They are required for ZCS hardware printing and for the Android system print dialog.
+
+### 1. ZCS SDK AAR (so the plugin can compile and run)
+
+The plugin provides the ZCS SDK to your app transitively. You must put the AAR file(s) **inside the plugin**, not in your app.
+
+| Who you are | What to do |
+|-------------|------------|
+| **Using the plugin from path or Git** | Copy the AAR into the plugin’s **`android/libs/`** folder (the `libs` folder inside the `zcs_printing` package). |
+| **Using the plugin from pub.dev** | The published package must already include the AAR in `android/libs/`. If it does not, use a path or Git dependency and add the AAR as above. |
+
+**Files:**
+
+- **Required:** `SmartPos_2.0.1_R251024.aar`
+- **Optional:** `emv_2.0.1_R251023.aar` (EMV; not used by this plugin)
+
+**You do not** add the AAR to your app’s `android/app/libs/` or add any ZCS dependency in your app’s `build.gradle`. The plugin supplies it.
+
+### 2. Permissions (your app)
+
+In **your app’s** `android/app/src/main/AndroidManifest.xml`, add these permissions inside the `<manifest>` tag (needed for Bluetooth printers, storage, and NFC):
+
+```xml
+<uses-permission android:name="android.permission.BLUETOOTH"/>
+<uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
+<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+<uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+<uses-permission android:name="android.permission.NFC" />
+```
+
+### 3. Gradle (your app)
+
+**No change needed.** The plugin’s `android/build.gradle` already declares the ZCS SDK with `implementation fileTree(dir: 'libs', include: ['*.jar', '*.aar'])`, so your app gets the SDK transitively. Do **not** add the AAR or this `fileTree` to your app’s `build.gradle`.
 
 ## Usage
 
