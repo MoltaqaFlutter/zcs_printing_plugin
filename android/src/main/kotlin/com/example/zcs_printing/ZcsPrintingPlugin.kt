@@ -158,6 +158,7 @@ class ZcsPrintingPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                         val imageBytes = call.argument<ByteArray>("imageBytes")
                         val imagePath = call.argument<String>("imagePath")
                         val alignment = call.argument<String>("alignment") ?: "center"
+                        val paperWidthPx = call.argument<Int>("paperWidthPx") ?: 384
                         val align = stringToAlignment(alignment)
                         
                         val bitmap = if (imageBytes != null) {
@@ -169,7 +170,8 @@ class ZcsPrintingPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                         }
                         
                         if (bitmap != null) {
-                            printer?.setPrintAppendBitmap(bitmap, align)
+                            val scaledBitmap = scaleBitmapToPrinterWidth(bitmap, paperWidthPx)
+                            printer?.setPrintAppendBitmap(scaledBitmap, align)
                             result.success(null)
                         } else {
                             result.error("invalidImage", "Failed to decode image", null)
@@ -301,6 +303,8 @@ class ZcsPrintingPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                         val cutAfterEachCopy = call.argument<Boolean>("cutAfterEachCopy") ?: false
                         val cutBetweenPages = call.argument<Boolean>("cutBetweenPages") ?: false
                         val spacingBetweenCopies = call.argument<Int>("spacingBetweenCopies") ?: 0
+                        // Paper width in pixels: 384 = 58mm, 576 = 80mm. Use paperWidthPx to match your POS paper.
+                        val paperWidthPx = call.argument<Int>("paperWidthPx") ?: 384
                         val supportsCutter = printer?.isSupportCutter() ?: false
                         
                         // Create a format for spacing (normal format)
@@ -329,8 +333,8 @@ class ZcsPrintingPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                                     )
                                     page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
                                     
-                                    // Scale bitmap to printer width (e.g., 384px for 58mm)
-                                    val scaledBitmap = scaleBitmapToPrinterWidth(bitmap, 384)
+                                    // Scale bitmap to fit paper width (scale up or down)
+                                    val scaledBitmap = scaleBitmapToPrinterWidth(bitmap, paperWidthPx)
                                     printer?.setPrintAppendBitmap(scaledBitmap, Layout.Alignment.ALIGN_CENTER)
                                     printer?.setPrintStart()
                                     
@@ -339,6 +343,12 @@ class ZcsPrintingPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                                     }
                                     
                                     page.close()
+                                }
+                                
+                                // Spacing after last page of this copy (for cutting margin)
+                                for (line in 1..2) {
+                                    printer?.setPrintAppendString("", spacingFormat)
+                                    printer?.setPrintStart()
                                 }
                                 
                                 // Add spacing between copies (not after the last copy)
@@ -450,8 +460,12 @@ class ZcsPrintingPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         }
     }
 
+    /**
+     * Scale bitmap to fit printer paper width. Scales both up and down so that
+     * the image always uses the full paper width (small PDFs are enlarged, large ones shrunk).
+     */
     private fun scaleBitmapToPrinterWidth(bitmap: Bitmap, targetWidth: Int): Bitmap {
-        if (bitmap.width <= targetWidth) return bitmap
+        if (bitmap.width <= 0) return bitmap
         val scale = targetWidth.toFloat() / bitmap.width
         val targetHeight = (bitmap.height * scale).toInt()
         return Bitmap.createScaledBitmap(bitmap, targetWidth, targetHeight, true)

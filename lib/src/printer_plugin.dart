@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/services.dart';
+import 'paper_width.dart';
 import 'printing_service_interface.dart';
 import 'printer_status.dart';
 import 'printer_error.dart';
@@ -160,6 +161,7 @@ class PrinterPlugin implements IPrintingServiceInterface {
     Uint8List? imageBytes,
     String? imagePath,
     String alignment = "center",
+    PaperWidth paperWidth = PaperWidth.width58mm,
   }) async {
     if (!Platform.isAndroid) {
       throw PrinterError.platformUnsupported();
@@ -174,6 +176,7 @@ class PrinterPlugin implements IPrintingServiceInterface {
         if (imageBytes != null) 'imageBytes': imageBytes,
         if (imagePath != null) 'imagePath': imagePath,
         'alignment': alignment,
+        'paperWidthPx': paperWidth.widthPx,
       });
     } on PlatformException catch (e) {
       throw _handlePlatformException(e);
@@ -296,6 +299,7 @@ class PrinterPlugin implements IPrintingServiceInterface {
     bool cutAfterEachCopy = false,
     bool cutBetweenPages = false,
     int spacingBetweenCopies = 0,
+    PaperWidth paperWidth = PaperWidth.width58mm,
   }) async {
     if (!Platform.isAndroid) {
       throw PrinterError.platformUnsupported();
@@ -312,6 +316,7 @@ class PrinterPlugin implements IPrintingServiceInterface {
         'cutAfterEachCopy': cutAfterEachCopy,
         'cutBetweenPages': cutBetweenPages,
         'spacingBetweenCopies': spacingBetweenCopies,
+        'paperWidthPx': paperWidth.widthPx,
       });
       return result;
     } on PlatformException catch (e) {

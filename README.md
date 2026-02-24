@@ -211,31 +211,48 @@ await printer.startPrint();
 
 ### Print image (bytes or file path)
 
+Images are scaled to fit paper width (same as PDF). Use [PaperWidth] to match your roll; default is 58mm.
+
 ```dart
-// From bytes
+// From bytes (default 58mm)
 await printer.appendBitmap(
   imageBytes: imageBytes,
   alignment: 'center',
 );
 await printer.startPrint();
 
-// From file path
+// From file path, 80mm paper
 await printer.appendBitmap(
   imagePath: '/path/to/image.jpg',
   alignment: 'center',
+  paperWidth: PaperWidth.width80mm,
 );
 await printer.startPrint();
 ```
 
 ### Print PDF
 
+PDF pages are scaled to fit the paper width (small PDFs are enlarged, large ones shrunk). Use the [PaperWidth] enum for standard sizes; default is **58mm**. After the last page of each copy, a few blank lines are added to leave space for the cutter.
+
+| Enum value | Paper width |
+|------------|-------------|
+| `PaperWidth.width55mm` | 55 mm (narrow rolls) |
+| `PaperWidth.width58mm` | **58 mm (default)** |
+| `PaperWidth.width80mm` | 80 mm (wide receipts/invoices) |
+
 ```dart
+import 'package:zcs_printing/zcs_printing.dart';
+
+// Default 58mm
+bool success = await printer.printPdf(pdfBytes, cutAfterEachCopy: true);
+
+// 80mm POS paper
 bool success = await printer.printPdf(
   pdfBytes,
   copies: 1,
   cutAfterEachCopy: true,
   cutBetweenPages: false,
-  spacingBetweenCopies: 0,
+  paperWidth: PaperWidth.width80mm,
 );
 ```
 
@@ -324,6 +341,7 @@ await printer.appendText('Custom', format);
 | `IPrintingServiceInterface` | Interface for all printing operations |
 | `PrinterPlugin`           | Default implementation (use this) |
 | `PrinterStatus`           | `ok`, `paperOut`, `error`, `busy`, `offline` |
+| `PaperWidth`              | Paper size for PDF: `width55mm`, `width58mm` (default), `width80mm` |
 | `PrinterError`            | Error with `code` and `message` |
 | `PrnStrFormat`             | Text format (size, alignment, style, font) |
 | `PrintFormats`            | Preset formats (header, normal, bold, etc.) |
@@ -343,7 +361,7 @@ The example demonstrates: status check, receipt, QR, barcode, image (gallery), P
 ## Notes
 
 - Printing is implemented via the ZCS SDK on Android; on iOS only system print (`printWithSystem`) is supported.
-- PDF printing converts each page to bitmaps then prints.
+- PDF printing converts each page to bitmaps, scales to fit paper width using [PaperWidth] (pixel width from [PaperWidth.widthPx]). Default is 58mm.
 - System print uses Android `PrintHelper` or iOS `UIPrintInteractionController`; cut behavior depends on the selected printer.
 - Cutter is used only when `isSupportCutter()` is true (Android only); cutting is skipped otherwise.
 - `cancelPrint()` dismisses the system print sheet on iOS when it is presented; on Android it returns `false`.

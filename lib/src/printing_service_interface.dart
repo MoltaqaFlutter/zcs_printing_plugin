@@ -1,82 +1,94 @@
 import 'dart:typed_data';
+import 'paper_width.dart';
 import 'printer_status.dart';
 import 'prn_str_format.dart';
 
-/// Interface for printing service
-/// Implemented by PrinterPlugin (Android) and stub (iOS)
+/// Main interface for ZCS/SmartPos printing from Flutter.
+///
+/// Use [PrinterPlugin] as the implementation. All methods that talk to the
+/// printer (receipts, PDF, images, QR, barcode) are defined here with clear
+/// parameter docs. Check each method's documentation for:
+/// - **Usage**: when to call it and in what order (e.g. append then startPrint).
+/// - **Parameters**: what each argument does and default values.
+/// - **Returns / Throws**: success value and possible errors.
+///
+/// Supported on Android (ZCS hardware + system print). On iOS only
+/// [printWithSystem] is supported; other methods throw [PrinterError].
 abstract class IPrintingServiceInterface {
-  /// Get current printer status
-  /// 
-  /// Returns: PrinterStatus enum indicating current printer state
-  /// 
-  /// Usage:
-  ///   PrinterStatus status = await printer.getPrinterStatus();
-  ///   if (status == PrinterStatus.ok) {
-  ///     // Printer is ready
-  ///   } else if (status == PrinterStatus.paperOut) {
-  ///     // Handle paper out
-  ///   }
+  /// Get current printer status.
+  ///
+  /// **Returns:** [PrinterStatus] — e.g. [PrinterStatus.ok], [PrinterStatus.paperOut].
+  ///
+  /// **Usage:** Call before printing to avoid errors (e.g. paper out).
+  ///
+  /// Example:
+  /// ```dart
+  /// final status = await printer.getPrinterStatus();
+  /// if (status == PrinterStatus.ok) {
+  ///   await printer.startPrint();
+  /// } else if (status == PrinterStatus.paperOut) {
+  ///   showError('Load paper');
+  /// }
+  /// ```
   Future<PrinterStatus> getPrinterStatus();
 
-  /// Check if device supports paper cutter
-  /// Returns: true if cutter is available, false otherwise
+  /// Check if the device supports a paper cutter.
+  ///
+  /// **Returns:** `true` if cutter is available, `false` otherwise.
+  /// Use this to decide whether to pass [cutAfterEachCopy] or [cutBetweenPages].
   Future<bool> isSupportCutter();
 
-  /// Append text to print buffer
-  /// 
-  /// Usage: Call multiple times to build a document, then call startPrint() to execute.
-  /// Example: 
-  ///   await printer.appendText("Header", format);
-  ///   await printer.appendText("Body text", format);
-  ///   await printer.startPrint();
-  /// 
-  /// [text] - The text string to print. Can contain newlines (\n) for line breaks.
-  /// [format] - Formatting options (textSize, alignment, style, font, custom font path).
+  /// Append text to the print buffer.
+  ///
+  /// **Parameters:**
+  /// - [text] — String to print. Can contain `\n` for line breaks.
+  /// - [format] — [PrnStrFormat] for size, alignment, style, font (or use [PrintFormats] presets).
+  ///
+  /// **Usage:** Call one or more append methods, then [startPrint]. Buffer is cleared after print.
+  ///
+  /// Example:
+  /// ```dart
+  /// await printer.appendText('Header', PrintFormats.header);
+  /// await printer.appendText('Body text', PrintFormats.normal);
+  /// await printer.startPrint();
+  /// ```
   Future<void> appendText(String text, PrnStrFormat format);
 
-  /// Append empty lines (blank spacing) to print buffer
-  /// 
-  /// Usage: Add vertical spacing between content sections.
-  /// Example:
-  ///   await printer.appendText("Header", format);
-  ///   await printer.appendEmptyLines(2);  // Add 2 blank lines
-  ///   await printer.appendText("Body", format);
-  /// 
-  /// [count] - Number of empty lines to add (default: 1, minimum: 1)
-  /// [format] - Optional format for the empty lines. If not provided, uses normal format.
+  /// Append empty lines (blank spacing) to the print buffer.
+  ///
+  /// **Parameters:**
+  /// - [count] — Number of empty lines (default: 1, minimum: 1).
+  /// - [format] — Optional format for the lines; if null, uses normal format.
+  ///
+  /// **Usage:** Add vertical spacing between sections (e.g. after header, before total).
   Future<void> appendEmptyLines({
     int count = 1,
     PrnStrFormat? format,
   });
 
-  /// Append multiple strings in columns to print buffer
-  /// 
-  /// Usage: Print table rows with aligned columns.
-  /// Example:
-  ///   await printer.appendStrings(
-  ///     ["Item", "Qty", "Price"],
-  ///     [2, 1, 1],  // Column width ratios
-  ///     [format, format, rightFormat]
-  ///   );
-  /// 
-  /// [texts] - List of strings, one per column
-  /// [columnWidths] - List of integers representing width ratios
-  /// [formats] - List of PrnStrFormat, one per column
+  /// Append a row of strings in columns (e.g. table row).
+  ///
+  /// **Parameters:**
+  /// - [texts] — One string per column (e.g. `['Item', 'Qty', 'Price']`).
+  /// - [columnWidths] — Width ratios per column (e.g. `[2, 1, 1]`).
+  /// - [formats] — One [PrnStrFormat] per column (e.g. normal for first two, rightAligned for price).
+  ///
+  /// **Usage:** Call for each row, then [startPrint]. Good for receipts and tables.
   Future<void> appendStrings(
     List<String> texts,
     List<int> columnWidths,
     List<PrnStrFormat> formats,
   );
 
-  /// Append QR code to print buffer
-  /// 
-  /// Usage: Generate QR code from data string.
-  /// Example: await printer.appendQrCode("https://example.com", width: 200, height: 200);
-  /// 
-  /// [data] - String to encode as QR code (URL, text, etc.)
-  /// [width] - QR code width in pixels (default: 200)
-  /// [height] - QR code height in pixels (default: 200)
-  /// [alignment] - String ("left", "center", "right") - QR code alignment (default: "center")
+  /// Append a QR code to the print buffer.
+  ///
+  /// **Parameters:**
+  /// - [data] — String to encode (URL, ticket id, etc.).
+  /// - [width] — QR width in pixels (default: 200).
+  /// - [height] — QR height in pixels (default: 200).
+  /// - [alignment] — `"left"`, `"center"`, or `"right"` (default: `"center"`).
+  ///
+  /// **Usage:** Append other content as needed, then [startPrint].
   Future<void> appendQrCode(
     String data, {
     int width = 200,
@@ -84,17 +96,15 @@ abstract class IPrintingServiceInterface {
     String alignment = "center",
   });
 
-  /// Append barcode to print buffer
-  /// 
-  /// Usage: Print barcode (e.g. CODE_128, EAN13).
-  /// Example: await printer.appendBarcode("6922711079066", format: "CODE_128");
-  /// 
-  /// [data] - String to encode as barcode
-  /// [format] - String ("CODE_128", "EAN13", etc.) - Barcode format (default: "CODE_128")
-  /// [width] - Barcode width in pixels (default: 360)
-  /// [height] - Barcode height in pixels (default: 100)
-  /// [showText] - bool - Show human-readable text below barcode (default: true)
-  /// [alignment] - String ("left", "center", "right") - Barcode alignment (default: "center")
+  /// Append a barcode to the print buffer.
+  ///
+  /// **Parameters:**
+  /// - [data] — String to encode (e.g. product code).
+  /// - [format] — Barcode format, e.g. `"CODE_128"`, `"EAN13"` (default: `"CODE_128"`).
+  /// - [width] — Barcode width in pixels (default: 360).
+  /// - [height] — Barcode height in pixels (default: 100).
+  /// - [showText] — Whether to show the number below the barcode (default: true).
+  /// - [alignment] — `"left"`, `"center"`, or `"right"` (default: `"center"`).
   Future<void> appendBarcode(
     String data, {
     String format = "CODE_128",
@@ -104,76 +114,67 @@ abstract class IPrintingServiceInterface {
     String alignment = "center",
   });
 
-  /// Append bitmap image to print buffer
-  /// 
-  /// Usage: Print image from bytes or file path.
-  /// Example: await printer.appendBitmap(imageBytes: imageBytes);
-  /// 
-  /// [imageBytes] - Uint8List - Image bytes (PNG, JPEG, BMP supported)
-  /// OR
-  /// [imagePath] - String - Path to image file on device
-  /// [alignment] - String ("left", "center", "right") - Image alignment (default: "center")
-  /// 
-  /// Note: Only provide either imageBytes OR imagePath, not both.
+  /// Append a bitmap image to the print buffer.
+  ///
+  /// The image is scaled to fit [paperWidth] (same as PDF) using [PaperWidth.widthPx].
+  ///
+  /// **Parameters:**
+  /// - [imageBytes] — Image bytes (PNG, JPEG, BMP), or
+  /// - [imagePath] — Path to an image file on device. Provide exactly one of these.
+  /// - [alignment] — `"left"`, `"center"`, or `"right"` (default: `"center"`).
+  /// - [paperWidth] — Paper size to scale image to (default [PaperWidth.width58mm]).
+  ///
+  /// **Usage:** Append other content if needed, then [startPrint].
   Future<void> appendBitmap({
     Uint8List? imageBytes,
     String? imagePath,
     String alignment = "center",
+    PaperWidth paperWidth = PaperWidth.width58mm,
   });
 
-  /// Execute print buffer - Print all content added via appendText/appendStrings/etc.
-  /// 
-  /// What it does:
-  /// - Sends all buffered content (text, QR, barcode, bitmap) to the printer
-  /// - Prints [copies] number of copies
-  /// - Adds [spacingBetweenCopies] empty lines between each copy (if copies > 1)
-  /// - If [cutAfterEachCopy] is true and device supports cutter, cuts paper after each copy
-  /// - Clears the buffer after printing
-  /// 
-  /// [copies] - Number of copies to print (default: 1, minimum: 1)
-  /// [cutAfterEachCopy] - If true and device supports cutter, cut paper after each copy (default: false)
-  /// [spacingBetweenCopies] - Number of empty lines to add between copies (default: 0, only applies when copies > 1)
-  /// 
-  /// Returns: bool - true if print was successful, false if failed
-  /// 
-  /// Throws: PrinterError if printer is unavailable, paper out, or other error occurs
-  /// 
-  /// Example:
-  ///   await printer.appendText("Receipt", format);
-  ///   await printer.startPrint(copies: 3, spacingBetweenCopies: 2);  // Print 3 copies with 2 blank lines between each
+  /// Send the print buffer to the printer and clear the buffer.
+  ///
+  /// Prints all content added with [appendText], [appendStrings], [appendQrCode],
+  /// [appendBarcode], [appendBitmap]. After printing, the buffer is cleared.
+  ///
+  /// **Parameters:**
+  /// - [copies] — Number of copies (default: 1, minimum: 1).
+  /// - [cutAfterEachCopy] — If true and device has cutter, cut after each copy (default: false).
+  /// - [spacingBetweenCopies] — Empty lines between copies when copies > 1 (default: 0).
+  ///
+  /// **Returns:** `true` if print succeeded, `false` otherwise.
+  ///
+  /// **Throws:** [PrinterError] if printer unavailable, paper out, etc.
   Future<bool> startPrint({
     int copies = 1,
     bool cutAfterEachCopy = false,
     int spacingBetweenCopies = 0,
   });
 
-  /// Cut paper immediately
-  /// 
-  /// Usage: Cut paper without printing (e.g. after manual feed).
-  /// If device does not support cutter, this is a no-op (no error).
+  /// Cut paper immediately (no-op if device has no cutter).
+  ///
+  /// **Usage:** e.g. after manual feed or to leave a clean edge.
   Future<void> cutPaper();
 
-  /// Set printer to label mode
-  /// 
-  /// Usage: Switch printer to label paper mode before printLabel().
-  /// [paperType] - String ("label" or "label80mm") - Label paper type
+  /// Set printer to label paper mode (required before [printLabel]).
+  ///
+  /// **Parameters:**
+  /// - [paperType] — `"label"` or `"label80mm"` to match your label roll.
   Future<void> setPrintType(String paperType);
 
-  /// Set number of lines to feed for label paper
-  /// 
-  /// Usage: Feed label paper before/after printing.
-  /// [lines] - int - Number of lines to feed (default: 30)
+  /// Set number of lines to feed for label paper.
+  ///
+  /// **Parameters:**
+  /// - [lines] — Number of lines to feed (default: 30). Use for label positioning.
   Future<void> setPrintLine({int lines = 30});
 
-  /// Print label (bitmap image)
-  /// 
-  /// Usage: Print image on label paper.
-  /// Example: await printer.printLabel(labelImageBytes, copies: 3, cutAfterEachCopy: true);
-  /// 
-  /// [bitmapBytes] - Uint8List - Image bytes for label
-  /// [copies] - Number of copies to print (default: 1)
-  /// [cutAfterEachCopy] - If true and device supports cutter, cut after each copy (default: false)
-  /// [spacingBetweenCopies] - Number of empty lines to add between copies (default: 0, only applies when copies > 1)
+  /// Print a bitmap on label paper (call [setPrintType] and optionally [setPrintLine] first).
+  ///
+  /// **Parameters:**
+  /// - [bitmapBytes] — Image bytes for the label.
+  /// - [copies] — Number of labels to print (default: 1).
+  /// - [cutAfterEachCopy] — Cut after each label if cutter supported (default: false).
+  /// - [spacingBetweenCopies] — Empty lines between copies when copies > 1 (default: 0).
   Future<void> printLabel(
     Uint8List bitmapBytes, {
     int copies = 1,
@@ -181,60 +182,66 @@ abstract class IPrintingServiceInterface {
     int spacingBetweenCopies = 0,
   });
 
-  /// Open cash drawer
-  /// 
-  /// Usage: Trigger cash drawer to open.
+  /// Open the connected cash drawer.
+  ///
+  /// **Usage:** Call when you need to open the drawer (e.g. after cash sale).
   Future<void> openCashDrawer();
 
-  /// Print PDF document
-  /// 
-  /// Usage: Convert PDF to bitmaps and print each page on ZCS device.
-  /// Example: await printer.printPdf(pdfBytes, copies: 2, cutAfterEachCopy: true);
-  /// 
-  /// [pdfBytes] - Uint8List - PDF file bytes
-  /// [copies] - Number of copies to print (default: 1)
-  /// [cutAfterEachCopy] - If true and device supports cutter, cut after each full copy (default: false)
-  /// [cutBetweenPages] - If true and device supports cutter, cut between PDF pages (default: false)
-  /// [spacingBetweenCopies] - Number of empty lines to add between copies (default: 0, only applies when copies > 1)
-  /// 
-  /// Returns: bool - true if print was successful, false if failed
-  /// 
-  /// Throws: PrinterError if PDF is invalid, printer unavailable, or other error occurs
+  /// Print a PDF by converting each page to an image and scaling to fit paper width.
+  ///
+  /// PDF pages are scaled to use the full paper width (small PDFs enlarged, large ones shrunk).
+  /// Use [paperWidth] to match your roll; pixel width is taken from [PaperWidth.widthPx].
+  ///
+  /// **Parameters:**
+  /// - [pdfBytes] — Raw PDF file bytes.
+  /// - [copies] — Number of copies (default: 1).
+  /// - [cutAfterEachCopy] — Cut after each full copy if cutter supported (default: false).
+  /// - [cutBetweenPages] — Cut between PDF pages if cutter supported (default: false).
+  /// - [spacingBetweenCopies] — Empty lines between copies when copies > 1 (default: 0).
+  /// - [paperWidth] — Paper size (default [PaperWidth.width58mm]). Use [PaperWidth.width80mm] for 80 mm; pixel width from [PaperWidth.widthPx].
+  ///
+  /// **Returns:** `true` if print succeeded, `false` otherwise.
+  ///
+  /// **Throws:** [PrinterError] if PDF is invalid or printer unavailable.
+  ///
+  /// Example:
+  /// ```dart
+  /// await printer.printPdf(pdfBytes, paperWidth: PaperWidth.width80mm);
+  /// await printer.printPdf(pdfBytes, copies: 2, cutAfterEachCopy: true);  // default 58mm
+  /// ```
   Future<bool> printPdf(
     Uint8List pdfBytes, {
     int copies = 1,
     bool cutAfterEachCopy = false,
     bool cutBetweenPages = false,
     int spacingBetweenCopies = 0,
+    PaperWidth paperWidth = PaperWidth.width58mm,
   });
 
-  /// Print using Android system print dialog (any printer or Save as PDF)
-  /// 
-  /// Usage: Show system print dialog so user can choose printer or save as PDF.
-  /// Example: await printer.printWithSystem(imageBytes, copies: 2);
-  /// 
-  /// [imageBytes] - Uint8List - Image bytes (PNG, JPEG, BMP)
-  /// [copies] - Number of copies to print (default: 1)
-  /// [cutAfterEachCopy] - If true, attempt to cut after each copy (only works if system printer supports it; may be ignored) (default: false)
-  /// 
-  /// Returns: bool - true if print dialog was shown successfully, false if failed
-  /// 
-  /// Throws: PrinterError if image is invalid, printer unavailable, or other error occurs
-  /// 
-  /// Note: This uses Android PrintHelper / iOS UIPrintInteractionController. User selects printer or "Save as PDF" in dialog.
-  /// Cut functionality depends on selected printer capabilities.
+  /// Show the system print dialog (choose printer or Save as PDF).
+  ///
+  /// Uses Android PrintHelper or iOS UIPrintInteractionController. User picks
+  /// printer or "Save as PDF". Cut behavior depends on the selected printer.
+  ///
+  /// **Parameters:**
+  /// - [imageBytes] — Image bytes (PNG, JPEG, BMP) to print.
+  /// - [copies] — Number of copies (default: 1).
+  /// - [cutAfterEachCopy] — Request cut after each copy if printer supports it (default: false).
+  ///
+  /// **Returns:** `true` if the dialog was shown, `false` otherwise.
+  ///
+  /// **Throws:** [PrinterError] if image is invalid or print unavailable.
   Future<bool> printWithSystem(
     Uint8List imageBytes, {
     int copies = 1,
     bool cutAfterEachCopy = false,
   });
 
-  /// Cancel current printing operation if possible.
+  /// Cancel the current printing operation if possible.
   ///
-  /// On iOS: Dismisses the system print sheet if it is currently presented.
-  /// On Android: System print dialog cannot be dismissed programmatically; returns false.
-  /// For direct ZCS printing, cancellation is not supported; returns false.
+  /// **Returns:** `true` if something was cancelled (e.g. system print sheet on iOS), `false` otherwise.
   ///
-  /// Returns: true if a print operation was cancelled/dismissed, false otherwise.
+  /// **Behavior:** On iOS, dismisses the system print sheet. On Android, the system
+  /// dialog cannot be dismissed by app; direct ZCS print has no cancel API.
   Future<bool> cancelPrint();
 }
