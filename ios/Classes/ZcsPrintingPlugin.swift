@@ -63,14 +63,17 @@ public class ZcsPrintingPlugin: NSObject, FlutterPlugin {
 
     currentPrintController = printController
 
-    printController.present(animated: true) { [weak self] _, completed, error in
-      self?.currentPrintController = nil
-      if let error = error {
-        result(FlutterError(code: "unknown", message: error.localizedDescription, details: nil))
-      } else {
-        result(completed)
+    printController.present(
+      animated: true,
+      completionHandler: { [weak self] _, completed, error in
+        self?.currentPrintController = nil
+        if let error = error {
+          result(FlutterError(code: "unknown", message: error.localizedDescription, details: nil))
+        } else {
+          result(completed)
+        }
       }
-    }
+    )
   }
 
   private func handleCancelPrint(result: @escaping FlutterResult) {

@@ -368,4 +368,4 @@ The example demonstrates: status check, receipt, QR, barcode, image (gallery), P
 
 ## License
 
-MIT
+Copyright (c) 2025 Moltaqa. Licensed under the [MIT License](LICENSE).
