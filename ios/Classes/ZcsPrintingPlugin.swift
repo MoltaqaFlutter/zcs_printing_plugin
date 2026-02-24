@@ -79,10 +79,10 @@ public class ZcsPrintingPlugin: NSObject, FlutterPlugin {
         result(false)
         return
       }
-      controller.dismiss(animated: true) {
-        self.currentPrintController = nil
-        result(true)
-      }
+      // UIPrintInteractionController.dismiss(animated:) has no completion parameter
+      controller.dismiss(animated: true)
+      self.currentPrintController = nil
+      result(true)
     }
   }
 
