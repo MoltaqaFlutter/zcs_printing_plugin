@@ -7,3 +7,4 @@ export 'src/printer_error.dart';
 export 'src/printer_status.dart';
 export 'src/prn_str_format.dart';
 export 'src/print_formats.dart';
+export 'src/image_processing_mode.dart';

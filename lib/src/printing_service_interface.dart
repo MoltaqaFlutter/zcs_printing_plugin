@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'paper_width.dart';
 import 'printer_status.dart';
 import 'prn_str_format.dart';
+import 'image_processing_mode.dart';
 
 /// Main interface for ZCS/SmartPos printing from Flutter.
 ///
@@ -130,6 +131,7 @@ abstract class IPrintingServiceInterface {
     String? imagePath,
     String alignment = "center",
     PaperWidth paperWidth = PaperWidth.width58mm,
+    bool convertToMonochrome = false,
   });
 
   /// Send the print buffer to the printer and clear the buffer.
@@ -216,6 +218,10 @@ abstract class IPrintingServiceInterface {
     bool cutBetweenPages = false,
     int spacingBetweenCopies = 0,
     PaperWidth paperWidth = PaperWidth.width58mm,
+    ImageProcessingMode imageMode = ImageProcessingMode.adaptiveThreshold,
+    int threshold = 128,
+    double gamma = 1.4,
+    int renderScale = 3,
   });
 
   /// Show the system print dialog (choose printer or Save as PDF).

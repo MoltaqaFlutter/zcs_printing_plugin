@@ -1,6 +1,6 @@
 name: zcs_printing
 description: A Flutter plugin for ZCS/SmartPos printer integration with PDF printing and system print support.
-version: 1.0.2+3
+version: 2.0.0
 homepage: https://github.com/MoltaqaFlutter/zcs_printing_plugin
 repository: https://github.com/MoltaqaFlutter/zcs_printing_plugin
 license: MIT
