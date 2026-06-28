@@ -34,6 +34,18 @@ class ZcsPrintingPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
     private var driverManager: DriverManager? = null
     private var printer: Printer? = null
     private var executor: ExecutorService? = null
+    private var bitmapProcessor: BitmapPrintProcessor? = null
+    private var bitmapProcessorWidthPx: Int = -1
+
+    private fun getBitmapProcessor(): BitmapPrintProcessor {
+        val width = getPrinterWidthPx()
+        val existing = bitmapProcessor
+        if (existing != null && bitmapProcessorWidthPx == width) return existing
+        val processor = BitmapPrintProcessor.create(context, width)
+        bitmapProcessor = processor
+        bitmapProcessorWidthPx = width
+        return processor
+    }
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(binding.binaryMessenger, "com.example.zcs_printing/printer")
@@ -105,11 +117,22 @@ class ZcsPrintingPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                 executor?.execute {
                     try {
                         val data = call.argument<String>("data") ?: ""
-                        val width = call.argument<Int>("width") ?: 200
-                        val height = call.argument<Int>("height") ?: 200
+                        val requestedWidth = call.argument<Int>("width") ?: 200
+                        val requestedHeight = call.argument<Int>("height") ?: 200
                         val alignment = call.argument<String>("alignment") ?: "center"
                         val align = stringToAlignment(alignment)
-                        printer?.setPrintAppendQRCode(data, width, height, align)
+                        val printerWidth = getPrinterWidthPx()
+                        // Keep QR square and within printable width so modules stay crisp.
+                        val qrSize = minOf(requestedWidth, requestedHeight, printerWidth - 32)
+                            .coerceAtLeast(120)
+                        val qrBitmap = Printer.createQRCode(data, qrSize, qrSize)
+                            ?: throw IllegalStateException("Failed to generate QR code")
+                        val processor = getBitmapProcessor()
+                        val qrOptions = BitmapPrintProcessor.Options(allowUpscale = false)
+                        val prepared = processor.prepareBitmapForPrinter(qrBitmap, printerWidth, qrOptions)
+                        qrBitmap.recycle()
+                        printer?.setPrintAppendBitmap(prepared, align)
+                        prepared.recycle()
                         result.success(null)
                     } catch (e: Exception) {
                         result.error("unknown", "Failed to append QR code", e.message)
@@ -160,22 +183,29 @@ class ZcsPrintingPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                         val alignment = call.argument<String>("alignment") ?: "center"
                         val paperWidthPx = call.argument<Int>("paperWidthPx") ?: 384
                         val align = stringToAlignment(alignment)
-                        
+                        val processor = getBitmapProcessor()
+                        val options = processor.parseOptions(call)
+                        val effectiveWidth = resolvePaperWidthPx(paperWidthPx)
+
+                        processor.configurePrintDensity(options.printGray) { gray ->
+                            printer?.setPrintGray(gray.toByte())
+                        }
+
                         val bitmap = if (imageBytes != null) {
-                            BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                            processor.decodeBitmapFromBytes(imageBytes, effectiveWidth)
                         } else if (imagePath != null) {
-                            BitmapFactory.decodeFile(imagePath)
+                            processor.decodeBitmapFromPath(imagePath, effectiveWidth)
                         } else {
                             throw IllegalArgumentException("Either imageBytes or imagePath must be provided")
                         }
-                        
-                        if (bitmap != null) {
-                            val scaledBitmap = scaleBitmapToPrinterWidth(bitmap, paperWidthPx)
-                            printer?.setPrintAppendBitmap(scaledBitmap, align)
-                            result.success(null)
-                        } else {
-                            result.error("invalidImage", "Failed to decode image", null)
+
+                        val prepared = processor.prepareBitmapForPrinter(bitmap, effectiveWidth, options)
+                        if (bitmap !== prepared) {
+                            bitmap.recycle()
                         }
+                        printer?.setPrintAppendBitmap(prepared, align)
+                        prepared.recycle()
+                        result.success(null)
                     } catch (e: Exception) {
                         result.error("invalidImage", "Failed to append bitmap: ${e.message}", null)
                     }
@@ -323,42 +353,57 @@ class ZcsPrintingPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                         val pdfRenderer = PdfRenderer(fileDescriptor)
                         
                         try {
+                            val effectiveWidth = resolvePaperWidthPx(paperWidthPx)
+                            val processor = getBitmapProcessor()
+                            val options = processor.parseOptions(call)
+                            processor.configurePrintDensity(options.printGray) { gray ->
+                                printer?.setPrintGray(gray.toByte())
+                            }
+
                             for (copy in 1..copies) {
-                                for (pageIndex in 0 until pdfRenderer.pageCount) {
-                                    val page = pdfRenderer.openPage(pageIndex)
-                                    val bitmap = Bitmap.createBitmap(
-                                        page.width,
-                                        page.height,
-                                        Bitmap.Config.ARGB_8888
-                                    )
-                                    page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
-                                    
-                                    // Scale bitmap to fit paper width (scale up or down)
-                                    val scaledBitmap = scaleBitmapToPrinterWidth(bitmap, paperWidthPx)
-                                    printer?.setPrintAppendBitmap(scaledBitmap, Layout.Alignment.ALIGN_CENTER)
-                                    printer?.setPrintStart()
-                                    
-                                    if (cutBetweenPages && supportsCutter && pageIndex < pdfRenderer.pageCount - 1) {
-                                        printer?.openPrnCutter(1)
+                                if (cutBetweenPages) {
+                                    for (pageIndex in 0 until pdfRenderer.pageCount) {
+                                        appendPdfPageBitmap(pdfRenderer, pageIndex, effectiveWidth, processor, options)
+                                        processor.configurePrintDensity(options.printGray) { gray ->
+                                            printer?.setPrintGray(gray.toByte())
+                                        }
+                                        val status = printer?.setPrintStart() ?: SdkResult.SDK_ERROR
+                                        if (status != SdkResult.SDK_OK && status != SdkResult.SDK_PRN_STATUS_PAPEROUT) {
+                                            result.success(false)
+                                            return@execute
+                                        }
+                                        if (supportsCutter && pageIndex < pdfRenderer.pageCount - 1) {
+                                            printer?.openPrnCutter(1)
+                                        }
                                     }
-                                    
-                                    page.close()
+                                } else {
+                                    for (pageIndex in 0 until pdfRenderer.pageCount) {
+                                        appendPdfPageBitmap(pdfRenderer, pageIndex, effectiveWidth, processor, options)
+                                    }
+                                    for (line in 1..2) {
+                                        printer?.setPrintAppendString("", spacingFormat)
+                                    }
+                                    processor.configurePrintDensity(options.printGray) { gray ->
+                                        printer?.setPrintGray(gray.toByte())
+                                    }
+                                    val status = printer?.setPrintStart() ?: SdkResult.SDK_ERROR
+                                    if (status != SdkResult.SDK_OK && status != SdkResult.SDK_PRN_STATUS_PAPEROUT) {
+                                        result.success(false)
+                                        return@execute
+                                    }
                                 }
-                                
-                                // Spacing after last page of this copy (for cutting margin)
-                                for (line in 1..2) {
-                                    printer?.setPrintAppendString("", spacingFormat)
-                                    printer?.setPrintStart()
-                                }
-                                
-                                // Add spacing between copies (not after the last copy)
+
                                 if (copy < copies && spacingBetweenCopies > 0) {
                                     for (line in 1..spacingBetweenCopies) {
                                         printer?.setPrintAppendString("", spacingFormat)
-                                        printer?.setPrintStart()
+                                    }
+                                    val status = printer?.setPrintStart() ?: SdkResult.SDK_ERROR
+                                    if (status != SdkResult.SDK_OK && status != SdkResult.SDK_PRN_STATUS_PAPEROUT) {
+                                        result.success(false)
+                                        return@execute
                                     }
                                 }
-                                
+
                                 if (cutAfterEachCopy && supportsCutter && copy < copies) {
                                     printer?.openPrnCutter(1)
                                 }
@@ -415,7 +460,7 @@ class ZcsPrintingPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
 
     private fun mapToPrnStrFormat(map: Map<String, Any?>): PrnStrFormat {
         val format = PrnStrFormat()
-        format.setTextSize((map["textSize"] as? Number)?.toInt() ?: 24)
+        format.setTextSize((map["textSize"] as? Number)?.toInt() ?: 26)
         
         val alignment = map["alignment"] as? String ?: "left"
         format.setAli(stringToAlignment(alignment))
@@ -460,15 +505,32 @@ class ZcsPrintingPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         }
     }
 
-    /**
-     * Scale bitmap to fit printer paper width. Scales both up and down so that
-     * the image always uses the full paper width (small PDFs are enlarged, large ones shrunk).
-     */
-    private fun scaleBitmapToPrinterWidth(bitmap: Bitmap, targetWidth: Int): Bitmap {
-        if (bitmap.width <= 0) return bitmap
-        val scale = targetWidth.toFloat() / bitmap.width
-        val targetHeight = (bitmap.height * scale).toInt()
-        return Bitmap.createScaledBitmap(bitmap, targetWidth, targetHeight, true)
+    private fun appendPdfPageBitmap(
+        pdfRenderer: PdfRenderer,
+        pageIndex: Int,
+        effectiveWidth: Int,
+        processor: BitmapPrintProcessor,
+        options: BitmapPrintProcessor.Options,
+    ) {
+        val page = pdfRenderer.openPage(pageIndex)
+        val bitmap = processor.renderPdfPageSupersampled(page, effectiveWidth, options)
+        page.close()
+
+        val prepared = processor.prepareBitmapForPrinter(bitmap, effectiveWidth, options)
+        if (bitmap !== prepared) {
+            bitmap.recycle()
+        }
+        printer?.setPrintAppendBitmap(prepared, Layout.Alignment.ALIGN_NORMAL)
+        prepared.recycle()
+    }
+
+    private fun getPrinterWidthPx(): Int {
+        return if (printer?.is80MMPrinter() == true) 576 else 384
+    }
+
+    /** Prefer explicit paper width, but never exceed the connected printer width. */
+    private fun resolvePaperWidthPx(requestedWidth: Int): Int {
+        return minOf(requestedWidth, getPrinterWidthPx())
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {

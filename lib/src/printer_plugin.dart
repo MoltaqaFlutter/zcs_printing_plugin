@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/services.dart';
+import 'bitmap_print_options.dart';
 import 'paper_width.dart';
 import 'printing_service_interface.dart';
 import 'printer_status.dart';
@@ -70,7 +71,7 @@ class PrinterPlugin implements IPrintingServiceInterface {
     }
 
     // Use normal format if not provided
-    final spacingFormat = format ?? PrnStrFormat(textSize: 24, alignment: 'left', style: 'normal', font: 'sansSerif');
+    final spacingFormat = format ?? PrnStrFormat(textSize: 26, alignment: 'left', style: 'normal', font: 'sansSerif');
 
     try {
       // Append empty string multiple times to create spacing
@@ -162,6 +163,7 @@ class PrinterPlugin implements IPrintingServiceInterface {
     String? imagePath,
     String alignment = "center",
     PaperWidth paperWidth = PaperWidth.width58mm,
+    BitmapPrintOptions? options,
   }) async {
     if (!Platform.isAndroid) {
       throw PrinterError.platformUnsupported();
@@ -177,6 +179,7 @@ class PrinterPlugin implements IPrintingServiceInterface {
         if (imagePath != null) 'imagePath': imagePath,
         'alignment': alignment,
         'paperWidthPx': paperWidth.widthPx,
+        ...(options ?? const BitmapPrintOptions()).toMap(),
       });
     } on PlatformException catch (e) {
       throw _handlePlatformException(e);
@@ -300,6 +303,7 @@ class PrinterPlugin implements IPrintingServiceInterface {
     bool cutBetweenPages = false,
     int spacingBetweenCopies = 0,
     PaperWidth paperWidth = PaperWidth.width58mm,
+    BitmapPrintOptions? options,
   }) async {
     if (!Platform.isAndroid) {
       throw PrinterError.platformUnsupported();
@@ -317,6 +321,7 @@ class PrinterPlugin implements IPrintingServiceInterface {
         'cutBetweenPages': cutBetweenPages,
         'spacingBetweenCopies': spacingBetweenCopies,
         'paperWidthPx': paperWidth.widthPx,
+        ...(options ?? const BitmapPrintOptions()).toMap(),
       });
       return result;
     } on PlatformException catch (e) {

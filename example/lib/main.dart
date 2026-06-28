@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:zcs_printing/zcs_printing.dart';
 import 'dart:io';
@@ -29,6 +30,17 @@ class _MyAppState extends State<MyApp> {
   int _printCount = 0;
   /// Number of copies to print (1 to _maxCopies)
   int _copiesCount = 1;
+  double _renderScale = 2.5;
+  int? _binarizationThreshold;
+  int _printGray = 3;
+  bool _useMonochromeConversion = true;
+
+  BitmapPrintOptions get _bitmapPrintOptions => BitmapPrintOptions(
+        renderScale: _renderScale,
+        binarizationThreshold: _binarizationThreshold,
+        printGray: _printGray,
+        useMonochromeConversion: _useMonochromeConversion,
+      );
 
   @override
   void initState() {
@@ -215,6 +227,7 @@ class _MyAppState extends State<MyApp> {
       await _printer.appendBitmap(
         imageBytes: imageBytes,
         alignment: 'center',
+        options: _bitmapPrintOptions,
       );
       await _printer.appendEmptyLines(count: 1);
 
@@ -275,6 +288,7 @@ class _MyAppState extends State<MyApp> {
         copies: copies,
         cutAfterEachCopy: _supportsCutter,
         cutBetweenPages: false,
+        options: _bitmapPrintOptions,
       );
       setState(() {
         _isLoading = false;
@@ -591,6 +605,10 @@ class _MyAppState extends State<MyApp> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _buildStatusCard(context),
+                    if (kDebugMode) ...[
+                      const SizedBox(height: 20),
+                      _buildQualityDebugCard(context),
+                    ],
                     const SizedBox(height: 20),
                     _buildPrintTestsCard(context),
                   ],
@@ -766,6 +784,97 @@ class _MyAppState extends State<MyApp> {
                   ),
                 ],
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQualityDebugCard(BuildContext context) {
+    const thresholdChoices = <int?>[null, 120, 140, 160, 180];
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.tune,
+                  size: 28,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Print Quality (Debug)',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 22,
+                      ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Tune PDF/image output. Debug builds also save processed bitmaps to app cache as print_preview_*.png.',
+              style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+            ),
+            const SizedBox(height: 16),
+            Text('Render scale: ${_renderScale.toStringAsFixed(1)}x'),
+            Slider(
+              value: _renderScale,
+              min: 1.0,
+              max: 4.0,
+              divisions: 4,
+              label: '${_renderScale.toStringAsFixed(1)}x',
+              onChanged: _isLoading
+                  ? null
+                  : (value) => setState(() => _renderScale = value),
+            ),
+            Text('Print gray: $_printGray'),
+            Slider(
+              value: _printGray.toDouble(),
+              min: 0,
+              max: 5,
+              divisions: 5,
+              label: '$_printGray',
+              onChanged: _isLoading
+                  ? null
+                  : (value) => setState(() => _printGray = value.round()),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Binarization threshold',
+              style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: thresholdChoices.map((threshold) {
+                final selected = _binarizationThreshold == threshold;
+                final label = threshold == null ? 'Auto' : '$threshold';
+                return ChoiceChip(
+                  label: Text(label),
+                  selected: selected,
+                  onSelected: _isLoading
+                      ? null
+                      : (_) => setState(() => _binarizationThreshold = threshold),
+                );
+              }).toList(),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Monochrome conversion'),
+              subtitle: const Text(
+                'Disable to send grayscale to the SDK instead of black/white.',
+              ),
+              value: _useMonochromeConversion,
+              onChanged: _isLoading
+                  ? null
+                  : (value) => setState(() => _useMonochromeConversion = value),
             ),
           ],
         ),

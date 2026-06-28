@@ -4,7 +4,7 @@ import 'prn_str_format.dart';
 class PrintFormats {
   /// Header format - large, centered, bold
   static PrnStrFormat get header => PrnStrFormat(
-        textSize: 30,
+        textSize: 32,
         alignment: 'center',
         style: 'bold',
         font: 'sansSerif',
@@ -12,7 +12,7 @@ class PrintFormats {
 
   /// Normal text format - standard size, left aligned
   static PrnStrFormat get normal => PrnStrFormat(
-        textSize: 24,
+        textSize: 26,
         alignment: 'left',
         style: 'normal',
         font: 'sansSerif',
@@ -20,7 +20,7 @@ class PrintFormats {
 
   /// Right-aligned format - useful for prices, totals
   static PrnStrFormat get rightAligned => PrnStrFormat(
-        textSize: 24,
+        textSize: 26,
         alignment: 'right',
         style: 'normal',
         font: 'monospace',
@@ -28,7 +28,7 @@ class PrintFormats {
 
   /// Center-aligned format
   static PrnStrFormat get center => PrnStrFormat(
-        textSize: 24,
+        textSize: 26,
         alignment: 'center',
         style: 'normal',
         font: 'sansSerif',
@@ -36,7 +36,7 @@ class PrintFormats {
 
   /// Bold format
   static PrnStrFormat get bold => PrnStrFormat(
-        textSize: 24,
+        textSize: 26,
         alignment: 'left',
         style: 'bold',
         font: 'sansSerif',
@@ -44,7 +44,7 @@ class PrintFormats {
 
   /// Small text format
   static PrnStrFormat get small => PrnStrFormat(
-        textSize: 20,
+        textSize: 22,
         alignment: 'left',
         style: 'normal',
         font: 'sansSerif',

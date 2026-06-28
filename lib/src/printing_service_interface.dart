@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'bitmap_print_options.dart';
 import 'paper_width.dart';
 import 'printer_status.dart';
 import 'prn_str_format.dart';
@@ -123,6 +124,7 @@ abstract class IPrintingServiceInterface {
   /// - [imagePath] — Path to an image file on device. Provide exactly one of these.
   /// - [alignment] — `"left"`, `"center"`, or `"right"` (default: `"center"`).
   /// - [paperWidth] — Paper size to scale image to (default [PaperWidth.width58mm]).
+  /// - [options] — Optional print quality tuning for thermal bitmap output.
   ///
   /// **Usage:** Append other content if needed, then [startPrint].
   Future<void> appendBitmap({
@@ -130,6 +132,7 @@ abstract class IPrintingServiceInterface {
     String? imagePath,
     String alignment = "center",
     PaperWidth paperWidth = PaperWidth.width58mm,
+    BitmapPrintOptions? options,
   });
 
   /// Send the print buffer to the printer and clear the buffer.
@@ -199,6 +202,7 @@ abstract class IPrintingServiceInterface {
   /// - [cutBetweenPages] — Cut between PDF pages if cutter supported (default: false).
   /// - [spacingBetweenCopies] — Empty lines between copies when copies > 1 (default: 0).
   /// - [paperWidth] — Paper size (default [PaperWidth.width58mm]). Use [PaperWidth.width80mm] for 80 mm; pixel width from [PaperWidth.widthPx].
+  /// - [options] — Optional print quality tuning for PDF rasterization and thermal output.
   ///
   /// **Returns:** `true` if print succeeded, `false` otherwise.
   ///
@@ -216,6 +220,7 @@ abstract class IPrintingServiceInterface {
     bool cutBetweenPages = false,
     int spacingBetweenCopies = 0,
     PaperWidth paperWidth = PaperWidth.width58mm,
+    BitmapPrintOptions? options,
   });
 
   /// Show the system print dialog (choose printer or Save as PDF).
