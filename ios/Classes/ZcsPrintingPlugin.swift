@@ -13,8 +13,6 @@ public class ZcsPrintingPlugin: NSObject, FlutterPlugin {
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     switch call.method {
-    case "printPdf":
-      handlePrintPdf(call: call, result: result)
     case "printWithSystem":
       handlePrintWithSystem(call: call, result: result)
     case "cancelPrint":
@@ -27,48 +25,6 @@ public class ZcsPrintingPlugin: NSObject, FlutterPlugin {
         details: nil
       ))
     }
-  }
-
-  private func handlePrintPdf(call: FlutterMethodCall, result: @escaping FlutterResult) {
-    guard let args = call.arguments as? [String: Any],
-          let pdfData = (args["pdfBytes"] as? FlutterStandardTypedData)?.data else {
-      result(FlutterError(code: "invalidPdf", message: "pdfBytes is required", details: nil))
-      return
-    }
-
-    DispatchQueue.main.async { [weak self] in
-      self?.presentPdfPrintSheet(pdfData: pdfData, result: result)
-    }
-  }
-
-  private func presentPdfPrintSheet(pdfData: Data, result: @escaping FlutterResult) {
-    guard let rootVC = rootViewController() else {
-      result(FlutterError(code: "printerNotAvailable", message: "No view controller to present print sheet", details: nil))
-      return
-    }
-
-    let printInfo = UIPrintInfo(dictionary: nil)
-    printInfo.jobName = "Print PDF"
-    printInfo.outputType = .general
-
-    let printController = UIPrintInteractionController.shared
-    printController.printInfo = printInfo
-    printController.printingItem = pdfData
-    printController.showsNumberOfCopies = true
-
-    currentPrintController = printController
-
-    printController.present(
-      animated: true,
-      completionHandler: { [weak self] _, completed, error in
-        self?.currentPrintController = nil
-        if let error = error {
-          result(FlutterError(code: "unknown", message: error.localizedDescription, details: nil))
-        } else {
-          result(completed)
-        }
-      }
-    )
   }
 
   private func handlePrintWithSystem(call: FlutterMethodCall, result: @escaping FlutterResult) {

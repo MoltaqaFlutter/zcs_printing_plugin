@@ -122,7 +122,7 @@ In **your app’s** `android/app/src/main/AndroidManifest.xml`, add these permis
 
 ### 3. Gradle (your app)
 
-**No change needed.** The plugin’s `android/build.gradle` already declares the ZCS SDK with `implementation fileTree(dir: 'libs', include: ['*.jar', '*.aar'])`, so your app gets the SDK transitively. Do **not** add the AAR or this `fileTree` to your app’s `build.gradle`.
+**No change needed.** Place the ZCS AAR file(s) in the plugin’s `android/libs/` folder (see step 1). The plugin compiles against them and adds them to your app automatically—do **not** add the AAR or a `fileTree` to your app’s `build.gradle`.
 
 ## Usage
 
@@ -254,7 +254,43 @@ bool success = await printer.printPdf(
   cutBetweenPages: false,
   paperWidth: PaperWidth.width80mm,
 );
+
+// Tune PDF/image thermal quality (Android)
+bool tuned = await printer.printPdf(
+  pdfBytes,
+  options: BitmapPrintOptions(
+    renderScale: 2.0,
+    printGray: 3,
+    binarizationThreshold: null, // null = auto (Otsu)
+  ),
+);
 ```
+
+### Print quality (PDF and images)
+
+PDF and image jobs are rasterized on Android before sending to the thermal printer. The plugin applies **2x supersampling**, **contrast normalization**, and **adaptive binarization (Otsu)** by default to reduce fuzzy or muddy text.
+
+Optional tuning via [`BitmapPrintOptions`](lib/src/bitmap_print_options.dart):
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `renderScale` | `2.0` | PDF supersampling factor (1.0–3.0) |
+| `binarizationThreshold` | `null` (auto) | Manual B/W threshold 0–255, or null for Otsu |
+| `printGray` | `3` | Thermal density (0–5), maps to ZCS `setPrintGray` |
+| `useMonochromeConversion` | `true` | Set false to send grayscale to the SDK |
+
+```dart
+await printer.appendBitmap(
+  imageBytes: imageBytes,
+  options: BitmapPrintOptions(printGray: 4, renderScale: 2.0),
+);
+```
+
+**Debug builds:** processed bitmaps are saved to the app cache as `print_preview_*.png` for before/after comparison on device.
+
+**Tuning tip:** Use the example app's **Print Quality (Debug)** panel to adjust settings, re-print the same PDF, then copy optimal values into your app.
+
+**Note:** Native text via `appendText` is not affected. For sharpest Arabic/Latin receipts, prefer `appendText` with a custom font over printing text as PDF when possible.
 
 ### System print (Android / iOS)
 

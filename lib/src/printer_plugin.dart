@@ -1,11 +1,11 @@
 import 'dart:io';
 import 'package:flutter/services.dart';
+import 'bitmap_print_options.dart';
 import 'paper_width.dart';
 import 'printing_service_interface.dart';
 import 'printer_status.dart';
 import 'printer_error.dart';
 import 'prn_str_format.dart';
-import 'image_processing_mode.dart';
 
 /// Printer plugin implementation
 /// Android: Uses MethodChannel to communicate with native code
@@ -71,7 +71,7 @@ class PrinterPlugin implements IPrintingServiceInterface {
     }
 
     // Use normal format if not provided
-    final spacingFormat = format ?? PrnStrFormat(textSize: 24, alignment: 'left', style: 'normal', font: 'sansSerif');
+    final spacingFormat = format ?? PrnStrFormat(textSize: 26, alignment: 'left', style: 'normal', font: 'sansSerif');
 
     try {
       // Append empty string multiple times to create spacing
@@ -163,7 +163,7 @@ class PrinterPlugin implements IPrintingServiceInterface {
     String? imagePath,
     String alignment = "center",
     PaperWidth paperWidth = PaperWidth.width58mm,
-    bool convertToMonochrome = false,
+    BitmapPrintOptions? options,
   }) async {
     if (!Platform.isAndroid) {
       throw PrinterError.platformUnsupported();
@@ -179,7 +179,7 @@ class PrinterPlugin implements IPrintingServiceInterface {
         if (imagePath != null) 'imagePath': imagePath,
         'alignment': alignment,
         'paperWidthPx': paperWidth.widthPx,
-        'convertToMonochrome': convertToMonochrome,
+        ...(options ?? const BitmapPrintOptions()).toMap(),
       });
     } on PlatformException catch (e) {
       throw _handlePlatformException(e);
@@ -303,10 +303,7 @@ class PrinterPlugin implements IPrintingServiceInterface {
     bool cutBetweenPages = false,
     int spacingBetweenCopies = 0,
     PaperWidth paperWidth = PaperWidth.width58mm,
-    ImageProcessingMode imageMode = ImageProcessingMode.adaptiveThreshold,
-    int threshold = 128,
-    double gamma = 1.4,
-    int renderScale = 3,
+    BitmapPrintOptions? options,
   }) async {
     if (!Platform.isAndroid) {
       throw PrinterError.platformUnsupported();
@@ -314,30 +311,6 @@ class PrinterPlugin implements IPrintingServiceInterface {
 
     if (spacingBetweenCopies < 0) {
       throw PrinterError.invalidArgument('spacingBetweenCopies must be non-negative');
-    }
-
-    if (renderScale < 1 || renderScale > 5) {
-      throw PrinterError.invalidArgument('renderScale must be between 1 and 5');
-    }
-
-    if (gamma < 0.5 || gamma > 3.0) {
-      throw PrinterError.invalidArgument('gamma must be between 0.5 and 3.0');
-    }
-
-    if (threshold < 0 || threshold > 255) {
-      throw PrinterError.invalidArgument('threshold must be between 0 and 255');
-    }
-
-    final String imageModeStr;
-    switch (imageMode) {
-      case ImageProcessingMode.simpleThreshold:
-        imageModeStr = 'threshold';
-      case ImageProcessingMode.adaptiveThreshold:
-        imageModeStr = 'adaptive';
-      case ImageProcessingMode.floydSteinberg:
-        imageModeStr = 'dither';
-      case ImageProcessingMode.none:
-        imageModeStr = 'none';
     }
 
     try {
@@ -348,10 +321,7 @@ class PrinterPlugin implements IPrintingServiceInterface {
         'cutBetweenPages': cutBetweenPages,
         'spacingBetweenCopies': spacingBetweenCopies,
         'paperWidthPx': paperWidth.widthPx,
-        'imageMode': imageModeStr,
-        'threshold': threshold,
-        'gamma': gamma,
-        'renderScale': renderScale,
+        ...(options ?? const BitmapPrintOptions()).toMap(),
       });
       return result;
     } on PlatformException catch (e) {

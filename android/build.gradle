@@ -14,18 +14,17 @@ buildscript {
     }
 }
 
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 
-def pluginProjectDir = projectDir
-
-rootProject.allprojects {
-    repositories {
-        maven {
-            url "${pluginProjectDir}/maven_repo"
-        }
-    }
-}
+def zcsLibsDir = file("${projectDir}/libs")
 
 android {
     namespace 'com.example.zcs_printing'
@@ -50,12 +49,21 @@ android {
 }
 
 dependencies {
-    // ZCS SDK - implementation so the AAR is supplied transitively to apps that use the plugin
-    implementation 'com.example.zcs:smartpos:2.0.1_R251024'
-    implementation 'com.example.zcs:emv:2.0.1_R251023'
-    implementation fileTree(dir: 'libs', include: ['*.jar'])
-    
+    // compileOnly: AGP 8+ rejects direct local .aar implementation deps when building a library AAR.
+    // Runtime AARs are added to the host app automatically below.
+    compileOnly fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
     // Android PrintHelper for system print
     implementation 'androidx.print:print:1.1.0'
     // Note: ZXing is already included in SmartPos SDK, so we don't add it separately
+}
+
+// Supply ZCS SDK AARs to the Flutter host app (APK/AAB), not the plugin AAR.
+gradle.projectsEvaluated {
+    rootProject.subprojects { sub ->
+        if (sub.plugins.hasPlugin('com.android.application')) {
+            sub.dependencies {
+                implementation fileTree(dir: zcsLibsDir, include: ['*.jar', '*.aar'])
+            }
+        }
+    }
 }
